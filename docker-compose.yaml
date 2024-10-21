@@ -1,0 +1,61 @@
+services:
+  kafka:
+    image: wurstmeister/kafka
+    container_name: kafka
+    environment:
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092     
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092 
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_CREATE_TOPICS: "my-topic:1:1"             
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+
+  zookeeper:
+    image: wurstmeister/zookeeper
+    ports:
+      - "2181:2181"
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - 16686:16686
+      - 14268:14268
+      - 14250:14250
+      - 16685:16685
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+    # healthcheck:
+    #   test: ["CMD", "wget", "--spider", "localhost:16686"]
+    #   interval: 1s
+    #   timeout: 3s
+    #   retries: 60
+
+  producer:
+    build: ./producer
+    depends_on:
+      - kafka
+      - jaeger
+    environment:
+      KAFKA_HOST: kafka:9092
+    ports:
+      - "3000:3000"  # Map port 3000 on the container to port 3000 on your host
+
+  consumer:
+    build: ./consumer
+    depends_on:
+      - kafka
+      - jaeger
+    environment:
+      KAFKA_HOST: kafka:9092
+    ports:
+      - "3001:3001" # Use Kafka's hostname as defined in the Compose file
+
+  tracetest-agent:
+    image: kubeshop/tracetest-agent:v1.5.5
+    environment:
+      - TRACETEST_API_KEY=${TRACETEST_TOKEN}
+      - TRACETEST_ENVIRONMENT_ID=${TRACETEST_ENVIRONMENT_ID}
+
+  
